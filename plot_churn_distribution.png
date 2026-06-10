@@ -1,0 +1,1302 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "2f07de50",
+   "metadata": {},
+   "source": [
+    "# 🎓 UAS Bengkel Koding Data Science\n",
+    "## Prediksi Customer Churn — Sales and Marketing Dataset\n",
+    "**Universitas Dian Nuswantoro | Program Bengkel Koding**\n",
+    "\n",
+    "---\n",
+    "\n",
+    "| Bagian | Isi |\n",
+    "|--------|-----|\n",
+    "| **1. EDA** | Eksplorasi, distribusi, korelasi, visualisasi |\n",
+    "| **2. Direct Modeling** | 3 model tanpa preprocessing |\n",
+    "| **3. Preprocessing + Modeling** | Cleaning, encoding, scaling, training ulang |\n",
+    "| **4. Hyperparameter Tuning** | Feature selection + GridSearch/RandomSearch |\n",
+    "| **5. Save Model** | Simpan artefak untuk deployment Streamlit |\n",
+    "\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "720ef6d8",
+   "metadata": {},
+   "source": [
+    "## 🔧 Setup — Import Library"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6811c137",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import matplotlib.ticker as mticker\n",
+    "import seaborn as sns\n",
+    "import warnings, os, joblib\n",
+    "from IPython.display import display\n",
+    "\n",
+    "from sklearn.model_selection  import (train_test_split, GridSearchCV, RandomizedSearchCV)\n",
+    "from sklearn.linear_model     import LogisticRegression\n",
+    "from sklearn.ensemble         import RandomForestClassifier, VotingClassifier\n",
+    "from sklearn.svm              import SVC\n",
+    "from sklearn.neighbors        import KNeighborsClassifier\n",
+    "from sklearn.preprocessing    import LabelEncoder, StandardScaler\n",
+    "from sklearn.metrics          import (accuracy_score, precision_score, recall_score,\n",
+    "                                      f1_score, confusion_matrix, classification_report)\n",
+    "\n",
+    "warnings.filterwarnings('ignore')\n",
+    "pd.set_option('display.max_columns', 50)\n",
+    "pd.set_option('display.float_format', '{:.4f}'.format)\n",
+    "sns.set_theme(style='whitegrid', palette='Set2')\n",
+    "plt.rcParams['figure.dpi'] = 100\n",
+    "\n",
+    "RANDOM_STATE = 42\n",
+    "TEST_SIZE    = 0.20\n",
+    "\n",
+    "os.makedirs('../plots', exist_ok=True)\n",
+    "os.makedirs('../model', exist_ok=True)\n",
+    "print(\"✅ Semua library berhasil diimport!\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "63c71df2",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 📊 Bagian 1 — Exploratory Data Analysis (EDA)\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e80fe912",
+   "metadata": {},
+   "source": [
+    "### 1.1 Load Dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9d675318",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df = pd.read_csv('../data/sales_marketing_dataset.csv')\n",
+    "print(f\"✅ Dataset berhasil dimuat!\")\n",
+    "print(f\"   Shape  : {df.shape[0]:,} baris × {df.shape[1]} kolom\")\n",
+    "print(f\"   Memori : {df.memory_usage(deep=True).sum() / 1024**2:.1f} MB\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b033a61f",
+   "metadata": {},
+   "source": [
+    "### 1.2 Tampilkan 5 Baris Pertama"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "33dbadae",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"🔍 5 Baris Pertama Dataset:\")\n",
+    "display(df.head())\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8487d6a7",
+   "metadata": {},
+   "source": [
+    "### 1.3 Informasi Dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c90dc6a7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"📋 Informasi Tipe Data & Non-Null Count:\")\n",
+    "print(\"=\" * 60)\n",
+    "df.info()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f584e415",
+   "metadata": {},
+   "source": [
+    "### 1.4 Statistik Deskriptif"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f120f183",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"📈 Statistik Deskriptif (Fitur Numerik):\")\n",
+    "display(df.describe().T.round(3))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5f9da3e9",
+   "metadata": {},
+   "source": [
+    "### 1.5 Persentase Missing Value"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "495f5f84",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "miss_pct  = (df.isnull().sum() / len(df) * 100).sort_values(ascending=False)\n",
+    "miss_show = miss_pct[miss_pct > 0].reset_index()\n",
+    "miss_show.columns = ['Kolom', 'Missing (%)']\n",
+    "miss_show['Jumlah'] = df.isnull().sum()[miss_show['Kolom']].values\n",
+    "\n",
+    "print(\"📌 Kolom dengan Missing Value:\")\n",
+    "display(miss_show)\n",
+    "\n",
+    "# Visualisasi\n",
+    "fig, ax = plt.subplots(figsize=(9, 4))\n",
+    "if len(miss_show) > 0:\n",
+    "    palette = sns.color_palette('Set2', len(miss_show))\n",
+    "    bars = ax.bar(miss_show['Kolom'], miss_show['Missing (%)'],\n",
+    "                  color=palette, edgecolor='white', linewidth=0.8)\n",
+    "    for b, v in zip(bars, miss_show['Missing (%)']):\n",
+    "        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.05,\n",
+    "                f'{v:.2f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')\n",
+    "    ax.set_title('Persentase Missing Value per Kolom', fontweight='bold', fontsize=13)\n",
+    "    ax.set_ylabel('Missing Value (%)')\n",
+    "    ax.set_ylim(0, miss_show['Missing (%)'].max() + 1.5)\n",
+    "    plt.xticks(rotation=20, ha='right')\n",
+    "else:\n",
+    "    ax.text(0.5, 0.5, '✅ Tidak ada missing value!',\n",
+    "            ha='center', va='center', transform=ax.transAxes, fontsize=14)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_missing_value.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_missing_value.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d638aa0e",
+   "metadata": {},
+   "source": [
+    "### 1.6 Distribusi Variabel Target (Churn)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "483342f3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "churn_cnt = df['churn'].value_counts().sort_index()\n",
+    "labels    = ['Tidak Churn (0)', 'Churn (1)']\n",
+    "pcts      = (churn_cnt / len(df) * 100).values\n",
+    "colors_c  = ['#2ecc71', '#e74c3c']\n",
+    "\n",
+    "fig, axes = plt.subplots(1, 2, figsize=(12, 5))\n",
+    "\n",
+    "# Bar chart\n",
+    "bars = axes[0].bar(labels, churn_cnt.values, color=colors_c, edgecolor='white', width=0.5)\n",
+    "for b, v, p in zip(bars, churn_cnt.values, pcts):\n",
+    "    axes[0].text(b.get_x() + b.get_width()/2, b.get_height() + 50,\n",
+    "                 f'{v:,}\\n({p:.1f}%)', ha='center', va='bottom',\n",
+    "                 fontsize=11, fontweight='bold')\n",
+    "axes[0].set_title('Distribusi Kelas Churn', fontweight='bold', fontsize=13)\n",
+    "axes[0].set_ylabel('Jumlah Pelanggan')\n",
+    "axes[0].set_ylim(0, churn_cnt.max() * 1.22)\n",
+    "\n",
+    "# Pie chart\n",
+    "axes[1].pie(churn_cnt.values, labels=labels, autopct='%1.1f%%',\n",
+    "            colors=colors_c, startangle=90,\n",
+    "            wedgeprops={'linewidth': 2, 'edgecolor': 'white'},\n",
+    "            textprops={'fontsize': 11})\n",
+    "axes[1].set_title('Proporsi Kelas Churn', fontweight='bold', fontsize=13)\n",
+    "\n",
+    "plt.suptitle('Distribusi Variabel Target (Churn)', fontsize=14, fontweight='bold', y=1.01)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_churn_distribution.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "\n",
+    "print(f\"Tidak Churn (0) : {churn_cnt[0]:,} pelanggan ({pcts[0]:.1f}%)\")\n",
+    "print(f\"Churn (1)       : {churn_cnt[1]:,} pelanggan ({pcts[1]:.1f}%)\")\n",
+    "print(f\"Rasio kelas     : {churn_cnt[0]/churn_cnt[1]:.2f}:1\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cc185a51",
+   "metadata": {},
+   "source": [
+    "### 1.7 Heatmap Korelasi Fitur Numerik"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "fe2ef4e0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "num_cols = [c for c in df.select_dtypes(include=np.number).columns if c != 'customer_id']\n",
+    "corr     = df[num_cols].corr()\n",
+    "\n",
+    "fig, ax = plt.subplots(figsize=(16, 12))\n",
+    "mask = np.triu(np.ones_like(corr, dtype=bool))\n",
+    "sns.heatmap(corr, mask=mask, annot=True, fmt='.2f',\n",
+    "            cmap=sns.diverging_palette(230, 20, as_cmap=True), center=0,\n",
+    "            linewidths=0.5, linecolor='white', square=True, ax=ax,\n",
+    "            annot_kws={'size': 7}, cbar_kws={'shrink': 0.8})\n",
+    "ax.set_title('Heatmap Korelasi Fitur Numerik', fontsize=14, fontweight='bold', pad=12)\n",
+    "plt.xticks(rotation=45, ha='right', fontsize=8)\n",
+    "plt.yticks(fontsize=8)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_heatmap_korelasi.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_heatmap_korelasi.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5808c50c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Korelasi fitur terhadap variabel target 'churn'\n",
+    "churn_corr = corr['churn'].drop('churn').sort_values(key=abs, ascending=False)\n",
+    "\n",
+    "fig, ax = plt.subplots(figsize=(10, 7))\n",
+    "bar_colors = ['#e74c3c' if v > 0 else '#3498db' for v in churn_corr.values]\n",
+    "bars = ax.barh(churn_corr.index, churn_corr.values, color=bar_colors, edgecolor='white')\n",
+    "for b, v in zip(bars, churn_corr.values):\n",
+    "    xp = v + 0.005 if v >= 0 else v - 0.005\n",
+    "    ax.text(xp, b.get_y() + b.get_height()/2, f'{v:.3f}',\n",
+    "            va='center', ha='left' if v >= 0 else 'right', fontsize=9)\n",
+    "ax.axvline(0, color='black', lw=0.8, ls='--', alpha=0.5)\n",
+    "ax.set_title('Korelasi Fitur Numerik terhadap Churn', fontweight='bold', fontsize=13)\n",
+    "ax.set_xlabel('Koefisien Korelasi Pearson')\n",
+    "from matplotlib.patches import Patch\n",
+    "ax.legend(handles=[Patch(facecolor='#e74c3c', label='Korelasi Positif'),\n",
+    "                   Patch(facecolor='#3498db', label='Korelasi Negatif')], loc='lower right')\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_korelasi_churn.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "\n",
+    "print(\"\\n🔑 Top 5 Korelasi Positif dengan Churn:\")\n",
+    "print(churn_corr[churn_corr > 0].head(5).to_string())\n",
+    "print(\"\\n🔑 Top 5 Korelasi Negatif dengan Churn:\")\n",
+    "print(churn_corr[churn_corr < 0].head(5).to_string())\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a4db7a64",
+   "metadata": {},
+   "source": [
+    "### 1.8 Distribusi Fitur Numerik Utama per Kelas Churn"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c474bb84",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "top8 = ['age', 'total_visits', 'avg_session_time', 'total_spent',\n",
+    "        'satisfaction_score', 'nps_score', 'support_tickets', 'lifetime_value']\n",
+    "\n",
+    "fig, axes = plt.subplots(2, 4, figsize=(18, 8))\n",
+    "axes = axes.flatten()\n",
+    "for ax, col in zip(axes, top8):\n",
+    "    d0 = df[df['churn'] == 0][col].dropna()\n",
+    "    d1 = df[df['churn'] == 1][col].dropna()\n",
+    "    ax.hist(d0, bins=30, alpha=0.6, color='#2ecc71', label='Tidak Churn', density=True)\n",
+    "    ax.hist(d1, bins=30, alpha=0.6, color='#e74c3c', label='Churn', density=True)\n",
+    "    ax.set_title(col, fontweight='bold', fontsize=10)\n",
+    "    ax.set_xlabel('Nilai'); ax.set_ylabel('Densitas')\n",
+    "    ax.legend(fontsize=8)\n",
+    "plt.suptitle('Distribusi Fitur Utama per Kelas Churn', fontsize=13, fontweight='bold', y=1.01)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_distribusi_fitur.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_distribusi_fitur.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "775e13b3",
+   "metadata": {},
+   "source": [
+    "### 1.9 Analisis Fitur Kategorikal vs Churn"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "47d610b3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "cat_analyze = ['gender', 'subscription_type', 'device_type', 'acquisition_channel']\n",
+    "fig, axes   = plt.subplots(1, 4, figsize=(18, 5))\n",
+    "\n",
+    "for ax, col in zip(axes, cat_analyze):\n",
+    "    churn_rate = df.groupby(col)['churn'].mean().sort_values(ascending=False)\n",
+    "    bars = ax.bar(churn_rate.index, churn_rate.values * 100,\n",
+    "                  color=sns.color_palette('Set2', len(churn_rate)), edgecolor='white')\n",
+    "    for b, v in zip(bars, churn_rate.values * 100):\n",
+    "        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.3,\n",
+    "                f'{v:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')\n",
+    "    ax.set_title(f'Churn Rate per {col}', fontweight='bold', fontsize=10)\n",
+    "    ax.set_ylabel('Churn Rate (%)')\n",
+    "    ax.set_ylim(0, churn_rate.max() * 120)\n",
+    "    plt.setp(ax.xaxis.get_majorticklabels(), rotation=20, ha='right', fontsize=9)\n",
+    "\n",
+    "plt.suptitle('Churn Rate per Kategori', fontsize=13, fontweight='bold', y=1.02)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_churn_rate_kategori.png', bbox_inches='tight')\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9f9865b1",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 🤖 Bagian 2 — Direct Modeling (Tanpa Preprocessing)\n",
+    "\n",
+    "> Model dilatih **langsung** tanpa preprocessing mendalam dan tanpa hyperparameter tuning.\n",
+    "> Hanya dilakukan encoding minimal dan imputasi sederhana agar model bisa berjalan.\n",
+    "\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9d821e15",
+   "metadata": {},
+   "source": [
+    "### 2.1 Persiapan Data (Minimal)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d46a45d6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load ulang data segar\n",
+    "df_dir = pd.read_csv('../data/sales_marketing_dataset.csv')\n",
+    "\n",
+    "# Drop kolom identifier & tanggal\n",
+    "drop_dir = ['customer_id', 'signup_date', 'last_purchase_date', 'coupon_code']\n",
+    "df_dir.drop(columns=drop_dir, inplace=True)\n",
+    "\n",
+    "# Imputasi MINIMAL (hanya agar tidak error, bukan preprocessing penuh)\n",
+    "for c in df_dir.select_dtypes(include=np.number).columns:\n",
+    "    df_dir[c] = df_dir[c].fillna(df_dir[c].median())\n",
+    "for c in df_dir.select_dtypes(include='object').columns:\n",
+    "    df_dir[c] = df_dir[c].fillna(df_dir[c].mode()[0])\n",
+    "\n",
+    "# Label Encoding minimal\n",
+    "for col in df_dir.select_dtypes(include='object').columns:\n",
+    "    df_dir[col] = LabelEncoder().fit_transform(df_dir[col].astype(str))\n",
+    "\n",
+    "# Fitur dan target\n",
+    "X_dir = df_dir.drop(columns=['churn'])\n",
+    "y_dir = df_dir['churn']\n",
+    "\n",
+    "# Train-test split 80:20\n",
+    "X_tr_d, X_te_d, y_tr_d, y_te_d = train_test_split(\n",
+    "    X_dir, y_dir, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y_dir)\n",
+    "\n",
+    "print(f\"✅ Fitur (X): {X_dir.shape[1]} kolom\")\n",
+    "print(f\"   Data latih : {X_tr_d.shape[0]:,} sampel ({(1-TEST_SIZE)*100:.0f}%)\")\n",
+    "print(f\"   Data uji   : {X_te_d.shape[0]:,} sampel ({TEST_SIZE*100:.0f}%)\")\n",
+    "print(f\"\\nDistribusi kelas — data latih: {dict(y_tr_d.value_counts().sort_index())}\")\n",
+    "print(f\"Distribusi kelas — data uji  : {dict(y_te_d.value_counts().sort_index())}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9be86995",
+   "metadata": {},
+   "source": [
+    "### 2.2 Fungsi Evaluasi"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "aa16402c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def eval_model(name, model, Xtr, Xte, ytr, yte):\n",
+    "    \"\"\"Latih model dan cetak semua metrik evaluasi.\"\"\"\n",
+    "    model.fit(Xtr, ytr)\n",
+    "    yp   = model.predict(Xte)\n",
+    "    acc  = accuracy_score(yte, yp)\n",
+    "    prec = precision_score(yte, yp, zero_division=0)\n",
+    "    rec  = recall_score(yte, yp, zero_division=0)\n",
+    "    f1   = f1_score(yte, yp, zero_division=0)\n",
+    "    cm   = confusion_matrix(yte, yp)\n",
+    "    label = name.replace('\\n', ' ')\n",
+    "    print(f\"\\n{'='*58}\")\n",
+    "    print(f\"  {label}\")\n",
+    "    print(f\"{'='*58}\")\n",
+    "    print(f\"  Accuracy  : {acc:.4f}  ({acc*100:.2f}%)\")\n",
+    "    print(f\"  Precision : {prec:.4f}\")\n",
+    "    print(f\"  Recall    : {rec:.4f}\")\n",
+    "    print(f\"  F1-Score  : {f1:.4f}\")\n",
+    "    print(f\"\\n  Classification Report:\")\n",
+    "    print(classification_report(yte, yp,\n",
+    "          target_names=['Tidak Churn (0)', 'Churn (1)'], zero_division=0))\n",
+    "    return {'Model': name, 'Accuracy': acc, 'Precision': prec,\n",
+    "            'Recall': rec, 'F1-Score': f1, 'CM': cm, 'obj': model}\n",
+    "\n",
+    "print(\"✅ Fungsi eval_model siap digunakan\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c7379836",
+   "metadata": {},
+   "source": [
+    "### 2.3 Definisi & Pelatihan Tiga Model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "607206af",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "models_dir = {\n",
+    "    'Logistic Regression\\n(Konvensional)':\n",
+    "        LogisticRegression(max_iter=300, random_state=RANDOM_STATE),\n",
+    "\n",
+    "    'Random Forest\\n(Ensemble Bagging)':\n",
+    "        RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1),\n",
+    "\n",
+    "    'Voting Classifier\\n(LR + SVM + KNN)':\n",
+    "        VotingClassifier(\n",
+    "            estimators=[\n",
+    "                ('lr',  LogisticRegression(max_iter=300, random_state=RANDOM_STATE)),\n",
+    "                ('svm', SVC(probability=True, random_state=RANDOM_STATE)),\n",
+    "                ('knn', KNeighborsClassifier(n_neighbors=5))\n",
+    "            ], voting='soft')\n",
+    "}\n",
+    "\n",
+    "print(\"🔄 Melatih tiga model direct...\")\n",
+    "results_dir = []\n",
+    "for name, mdl in models_dir.items():\n",
+    "    res = eval_model(name, mdl, X_tr_d, X_te_d, y_tr_d, y_te_d)\n",
+    "    results_dir.append(res)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "dba83d9c",
+   "metadata": {},
+   "source": [
+    "### 2.4 Visualisasi Confusion Matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "99397ef3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig, axes = plt.subplots(1, 3, figsize=(16, 5))\n",
+    "cmaps_ = ['Blues', 'Greens', 'Oranges']\n",
+    "\n",
+    "for ax, res, cmap_ in zip(axes, results_dir, cmaps_):\n",
+    "    sn = res['Model'].replace('\\n', ' ')\n",
+    "    sns.heatmap(res['CM'], annot=True, fmt='d', cmap=cmap_, ax=ax,\n",
+    "                xticklabels=['Pred: 0', 'Pred: 1'],\n",
+    "                yticklabels=['Aktual: 0', 'Aktual: 1'],\n",
+    "                linewidths=1, linecolor='white',\n",
+    "                annot_kws={'size': 14, 'weight': 'bold'})\n",
+    "    ax.set_title(f\"{sn}\\nAcc: {res['Accuracy']:.3f}  |  F1: {res['F1-Score']:.3f}\",\n",
+    "                 fontsize=9, fontweight='bold')\n",
+    "    ax.set_xlabel('Prediksi'); ax.set_ylabel('Aktual')\n",
+    "\n",
+    "plt.suptitle('Confusion Matrix — Direct Modeling (Tanpa Preprocessing)',\n",
+    "             fontsize=13, fontweight='bold', y=1.02)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_cm_direct.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_cm_direct.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "431f42bf",
+   "metadata": {},
+   "source": [
+    "### 2.5 Ringkasan Metrik Direct Modeling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a060c7de",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "metrics_keys = ['Accuracy', 'Precision', 'Recall', 'F1-Score']\n",
+    "summ_d = pd.DataFrame([{k: r[k] for k in ['Model'] + metrics_keys} for r in results_dir])\n",
+    "summ_d['Model'] = summ_d['Model'].str.replace('\\n', ' ')\n",
+    "\n",
+    "print(\"\\n📊 Tabel Ringkasan — Direct Modeling:\")\n",
+    "display(summ_d.set_index('Model').style\n",
+    "        .format('{:.4f}')\n",
+    "        .background_gradient(cmap='YlGn', subset=['Accuracy', 'F1-Score'])\n",
+    "        .set_caption('Direct Modeling — Tanpa Preprocessing'))\n",
+    "\n",
+    "# Bar chart perbandingan\n",
+    "fig, ax = plt.subplots(figsize=(12, 5))\n",
+    "x = np.arange(len(metrics_keys)); w = 0.25\n",
+    "colors_m = ['#3498db', '#2ecc71', '#e67e22']\n",
+    "\n",
+    "for i, (res, col) in enumerate(zip(results_dir, colors_m)):\n",
+    "    vals = [res[k] for k in metrics_keys]\n",
+    "    bars = ax.bar(x + i*w, vals, w, label=res['Model'].replace('\\n', ' '),\n",
+    "                  color=col, alpha=0.85, edgecolor='white')\n",
+    "    for b, v in zip(bars, vals):\n",
+    "        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.003,\n",
+    "                f'{v:.3f}', ha='center', va='bottom', fontsize=8, fontweight='bold')\n",
+    "\n",
+    "ax.set_xticks(x + w); ax.set_xticklabels(metrics_keys, fontsize=11)\n",
+    "ax.set_ylabel('Score'); ax.set_ylim(0, 1.15)\n",
+    "ax.set_title('Perbandingan Metrik — Direct Modeling', fontweight='bold', fontsize=13)\n",
+    "ax.legend(fontsize=9)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_metrik_direct.png', bbox_inches='tight')\n",
+    "plt.show()\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "452b2457",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 🔧 Bagian 3 — Modeling dengan Preprocessing\n",
+    "\n",
+    "> Data dibersihkan secara menyeluruh sebelum pelatihan.\n",
+    "> **Scaling dilakukan SETELAH train-test split** untuk menghindari data leakage.\n",
+    "\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e286bbbf",
+   "metadata": {},
+   "source": [
+    "### 3.1 Penanganan Missing Value, Duplikat & Outlier"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0149a40e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_pp = pd.read_csv('../data/sales_marketing_dataset.csv')\n",
+    "print(f\"Shape awal  : {df_pp.shape}\")\n",
+    "print(f\"Duplikat    : {df_pp.duplicated().sum()}\")\n",
+    "print(f\"Total NaN   : {df_pp.isnull().sum().sum()}\")\n",
+    "\n",
+    "# 1️⃣ Hapus duplikat\n",
+    "n_before = len(df_pp)\n",
+    "df_pp.drop_duplicates(inplace=True)\n",
+    "print(f\"\\n[1] Duplikat dihapus: {n_before - len(df_pp)} baris\")\n",
+    "\n",
+    "# 2️⃣ Drop kolom tidak relevan\n",
+    "drop_irr = ['customer_id', 'signup_date', 'last_purchase_date', 'coupon_code']\n",
+    "df_pp.drop(columns=drop_irr, inplace=True)\n",
+    "print(f\"[2] Kolom dihapus   : {drop_irr}\")\n",
+    "\n",
+    "# 3️⃣ Imputasi missing value (sebelum encoding)\n",
+    "print(\"\\n[3] Imputasi missing value:\")\n",
+    "for c in df_pp.select_dtypes(include=np.number).columns:\n",
+    "    n = df_pp[c].isnull().sum()\n",
+    "    if n > 0:\n",
+    "        val = df_pp[c].median()\n",
+    "        df_pp[c] = df_pp[c].fillna(val)\n",
+    "        print(f\"    '{c}': {n} nilai → median = {val:.2f}\")\n",
+    "for c in df_pp.select_dtypes(include='object').columns:\n",
+    "    n = df_pp[c].isnull().sum()\n",
+    "    if n > 0:\n",
+    "        val = df_pp[c].mode()[0]\n",
+    "        df_pp[c] = df_pp[c].fillna(val)\n",
+    "        print(f\"    '{c}': {n} nilai → modus = '{val}'\")\n",
+    "\n",
+    "assert df_pp.isnull().sum().sum() == 0, \"‼️ Masih ada NaN!\"\n",
+    "print(\"\\n✅ Tidak ada missing value tersisa\")\n",
+    "\n",
+    "# 4️⃣ Outlier — IQR clipping\n",
+    "print(\"\\n[4] Penanganan outlier (IQR clipping):\")\n",
+    "clip_cols = ['age', 'avg_session_time', 'total_spent', 'avg_order_value',\n",
+    "             'lifetime_value', 'marketing_spend_per_user']\n",
+    "for c in clip_cols:\n",
+    "    Q1, Q3 = df_pp[c].quantile(0.25), df_pp[c].quantile(0.75)\n",
+    "    IQR = Q3 - Q1\n",
+    "    lo, hi = Q1 - 1.5*IQR, Q3 + 1.5*IQR\n",
+    "    n_out = ((df_pp[c] < lo) | (df_pp[c] > hi)).sum()\n",
+    "    df_pp[c] = df_pp[c].clip(lo, hi)\n",
+    "    print(f\"    '{c}': {n_out} outlier → clip [{lo:.1f}, {hi:.1f}]\")\n",
+    "\n",
+    "print(f\"\\n✅ Shape setelah preprocessing awal: {df_pp.shape}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "94354c53",
+   "metadata": {},
+   "source": [
+    "### 3.2 Encoding Fitur Kategorikal"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6fa73d87",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "cat_cols = df_pp.select_dtypes(include='object').columns.tolist()\n",
+    "print(f\"Kolom kategorikal yang akan diencode: {cat_cols}\\n\")\n",
+    "\n",
+    "le_map = {}\n",
+    "for col in cat_cols:\n",
+    "    le = LabelEncoder()\n",
+    "    df_pp[col] = le.fit_transform(df_pp[col].astype(str))\n",
+    "    le_map[col] = le\n",
+    "    print(f\"  '{col}': {len(le.classes_)} kelas → {dict(zip(le.classes_[:4], le.transform(le.classes_[:4])))}\")\n",
+    "\n",
+    "print(f\"\\n✅ Encoding selesai. Shape: {df_pp.shape}\")\n",
+    "print(f\"   NaN setelah encode: {df_pp.isnull().sum().sum()}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b7e176f7",
+   "metadata": {},
+   "source": [
+    "### 3.3 Train-Test Split & Feature Scaling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2b217361",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "X_pp = df_pp.drop(columns=['churn'])\n",
+    "y_pp = df_pp['churn']\n",
+    "\n",
+    "# Split dengan proporsi sama seperti direct modeling (80:20, stratified)\n",
+    "X_tr_p, X_te_p, y_tr_p, y_te_p = train_test_split(\n",
+    "    X_pp, y_pp, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y_pp)\n",
+    "\n",
+    "# ─── SCALING dilakukan SETELAH split ─────────────────────────────────────────\n",
+    "# fit_transform hanya pada data LATIH, transform saja pada data UJI\n",
+    "scaler_pp = StandardScaler()\n",
+    "X_tr_p_sc = scaler_pp.fit_transform(X_tr_p)   # fit + transform\n",
+    "X_te_p_sc = scaler_pp.transform(X_te_p)        # transform saja (no leakage)\n",
+    "\n",
+    "print(f\"Data latih  : {X_tr_p_sc.shape} (scaled)\")\n",
+    "print(f\"Data uji    : {X_te_p_sc.shape} (scaled)\")\n",
+    "print(f\"\\n✅ Scaling selesai — StandardScaler di-fit HANYA pada data latih\")\n",
+    "print(f\"   → Tidak ada data leakage dari data uji\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "65e07a17",
+   "metadata": {},
+   "source": [
+    "### 3.4 Latih Ulang Tiga Model dengan Data Bersih"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7d1f157b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "models_pp = {\n",
+    "    'Logistic Regression\\n(Konvensional)':\n",
+    "        LogisticRegression(max_iter=500, random_state=RANDOM_STATE),\n",
+    "\n",
+    "    'Random Forest\\n(Ensemble Bagging)':\n",
+    "        RandomForestClassifier(n_estimators=100, random_state=RANDOM_STATE, n_jobs=-1),\n",
+    "\n",
+    "    'Voting Classifier\\n(LR + SVM + KNN)':\n",
+    "        VotingClassifier(\n",
+    "            estimators=[\n",
+    "                ('lr',  LogisticRegression(max_iter=500, random_state=RANDOM_STATE)),\n",
+    "                ('svm', SVC(probability=True, random_state=RANDOM_STATE)),\n",
+    "                ('knn', KNeighborsClassifier(n_neighbors=5))\n",
+    "            ], voting='soft')\n",
+    "}\n",
+    "\n",
+    "print(\"🔄 Melatih model dengan data preprocessing...\")\n",
+    "results_pp = []\n",
+    "for name, mdl in models_pp.items():\n",
+    "    res = eval_model(name, mdl, X_tr_p_sc, X_te_p_sc, y_tr_p, y_te_p)\n",
+    "    results_pp.append(res)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6c0eb47f",
+   "metadata": {},
+   "source": [
+    "### 3.5 Confusion Matrix & Ringkasan Preprocessing"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d44e134f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig, axes = plt.subplots(1, 3, figsize=(16, 5))\n",
+    "for ax, res, cmap_ in zip(axes, results_pp, ['Blues', 'Greens', 'Oranges']):\n",
+    "    sns.heatmap(res['CM'], annot=True, fmt='d', cmap=cmap_, ax=ax,\n",
+    "                xticklabels=['Pred: 0', 'Pred: 1'],\n",
+    "                yticklabels=['Aktual: 0', 'Aktual: 1'],\n",
+    "                linewidths=1, linecolor='white',\n",
+    "                annot_kws={'size': 14, 'weight': 'bold'})\n",
+    "    sn = res['Model'].replace('\\n', ' ')\n",
+    "    ax.set_title(f\"{sn}\\nAcc: {res['Accuracy']:.3f}  |  F1: {res['F1-Score']:.3f}\",\n",
+    "                 fontsize=9, fontweight='bold')\n",
+    "    ax.set_xlabel('Prediksi'); ax.set_ylabel('Aktual')\n",
+    "\n",
+    "plt.suptitle('Confusion Matrix — Modeling dengan Preprocessing',\n",
+    "             fontsize=13, fontweight='bold', y=1.02)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_cm_preprocessing.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "\n",
+    "summ_pp = pd.DataFrame([{k: r[k] for k in ['Model', 'Accuracy', 'Precision', 'Recall', 'F1-Score']}\n",
+    "                         for r in results_pp])\n",
+    "summ_pp['Model'] = summ_pp['Model'].str.replace('\\n', ' ')\n",
+    "print(\"\\n📊 Ringkasan Preprocessing:\")\n",
+    "display(summ_pp.set_index('Model').style\n",
+    "        .format('{:.4f}')\n",
+    "        .background_gradient(cmap='YlGn', subset=['Accuracy', 'F1-Score']))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e7c3c2c6",
+   "metadata": {},
+   "source": [
+    "### 3.6 Perbandingan Direct vs Preprocessing"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4c530b5c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model_short = ['LR', 'Random Forest', 'Voting Clf']\n",
+    "fig, axes   = plt.subplots(1, 2, figsize=(13, 5))\n",
+    "\n",
+    "for ax, metric in zip(axes, ['Accuracy', 'F1-Score']):\n",
+    "    x  = np.arange(len(model_short)); w = 0.35\n",
+    "    dv = [r[metric] for r in results_dir]\n",
+    "    pv = [r[metric] for r in results_pp]\n",
+    "    b1 = ax.bar(x - w/2, dv, w, label='Direct',        color='#95a5a6', alpha=0.85, edgecolor='white')\n",
+    "    b2 = ax.bar(x + w/2, pv, w, label='Preprocessing', color='#3498db', alpha=0.85, edgecolor='white')\n",
+    "    for b, v in [*zip(b1, dv), *zip(b2, pv)]:\n",
+    "        ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.003,\n",
+    "                f'{v:.3f}', ha='center', va='bottom', fontsize=9, fontweight='bold')\n",
+    "    ax.set_xticks(x); ax.set_xticklabels(model_short, fontsize=10)\n",
+    "    ax.set_title(f'Perbandingan {metric}', fontweight='bold', fontsize=12)\n",
+    "    ax.set_ylabel(metric); ax.set_ylim(0, 1.15); ax.legend(fontsize=10)\n",
+    "\n",
+    "plt.suptitle('Direct vs Preprocessing — Perbandingan Performa',\n",
+    "             fontsize=13, fontweight='bold', y=1.01)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_direct_vs_preprocessing.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_direct_vs_preprocessing.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "39896e82",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## ⚙️ Bagian 4 — Hyperparameter Tuning & Feature Selection\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f7712a41",
+   "metadata": {},
+   "source": [
+    "### 4.1 Feature Importance Analysis (Random Forest)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5bb10ec7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Gunakan RF dari skenario preprocessing\n",
+    "rf_for_fi   = results_pp[1]['obj']\n",
+    "importances = pd.Series(rf_for_fi.feature_importances_, index=X_pp.columns)\n",
+    "importances = importances.sort_values(ascending=False)\n",
+    "\n",
+    "fig, ax = plt.subplots(figsize=(12, 6))\n",
+    "palette_fi = sns.color_palette('viridis', len(importances))\n",
+    "ax.barh(importances.index, importances.values, color=palette_fi, edgecolor='white')\n",
+    "ax.set_title('Feature Importance — Random Forest (Preprocessing Scenario)',\n",
+    "             fontsize=13, fontweight='bold')\n",
+    "ax.set_xlabel('Importance Score')\n",
+    "ax.invert_yaxis()\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_feature_importance.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "\n",
+    "TOP_N        = 15\n",
+    "top_features = importances.head(TOP_N).index.tolist()\n",
+    "print(f\"\\n✅ Top-{TOP_N} Fitur Terpilih (Feature Selection):\")\n",
+    "print(\"-\" * 50)\n",
+    "for i, f in enumerate(top_features, 1):\n",
+    "    print(f\"  {i:2d}. {f:<40s} {importances[f]:.4f}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3df340db",
+   "metadata": {},
+   "source": [
+    "### 4.2 Subset Data & Re-Scaling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0df099ba",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Subset ke top features, scale ulang (scaler baru khusus top features)\n",
+    "scaler_fs = StandardScaler()\n",
+    "X_tr_fs   = scaler_fs.fit_transform(X_tr_p[top_features])   # fit + transform\n",
+    "X_te_fs   = scaler_fs.transform(X_te_p[top_features])       # transform saja\n",
+    "\n",
+    "print(f\"Shape data latih (feature selected) : {X_tr_fs.shape}\")\n",
+    "print(f\"Shape data uji   (feature selected) : {X_te_fs.shape}\")\n",
+    "print(f\"\\nFitur berkurang: {X_pp.shape[1]} → {len(top_features)} kolom\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "933474bd",
+   "metadata": {},
+   "source": [
+    "### 4.3 Hyperparameter Tuning — Logistic Regression (GridSearchCV)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "366e638e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "param_lr = {\n",
+    "    'C'      : [0.001, 0.01, 0.1, 1, 10, 100],\n",
+    "    'solver' : ['lbfgs', 'liblinear'],\n",
+    "    'penalty': ['l2']\n",
+    "}\n",
+    "\n",
+    "gs_lr = GridSearchCV(\n",
+    "    LogisticRegression(max_iter=1000, random_state=RANDOM_STATE),\n",
+    "    param_lr, cv=5, scoring='f1', n_jobs=-1, verbose=0)\n",
+    "\n",
+    "gs_lr.fit(X_tr_fs, y_tr_p)\n",
+    "\n",
+    "print(f\"✅ LR Best Parameters : {gs_lr.best_params_}\")\n",
+    "print(f\"   CV F1-Score (mean)  : {gs_lr.best_score_:.4f}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ff8bf1dd",
+   "metadata": {},
+   "source": [
+    "### 4.4 Hyperparameter Tuning — Random Forest (RandomizedSearchCV)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9020a31f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "param_rf = {\n",
+    "    'n_estimators'     : [100, 200, 300, 500],\n",
+    "    'max_depth'        : [None, 5, 10, 20, 30],\n",
+    "    'min_samples_split': [2, 5, 10],\n",
+    "    'min_samples_leaf' : [1, 2, 4],\n",
+    "    'max_features'     : ['sqrt', 'log2'],\n",
+    "    'bootstrap'        : [True, False]\n",
+    "}\n",
+    "\n",
+    "rs_rf = RandomizedSearchCV(\n",
+    "    RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1),\n",
+    "    param_rf, n_iter=20, cv=5, scoring='f1',\n",
+    "    random_state=RANDOM_STATE, n_jobs=-1, verbose=0)\n",
+    "\n",
+    "rs_rf.fit(X_tr_fs, y_tr_p)\n",
+    "\n",
+    "print(f\"✅ RF Best Parameters  : {rs_rf.best_params_}\")\n",
+    "print(f\"   CV F1-Score (mean)  : {rs_rf.best_score_:.4f}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "838731f6",
+   "metadata": {},
+   "source": [
+    "### 4.5 Hyperparameter Tuning — Voting Classifier (GridSearchCV)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4c1686ee",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "base_vc = VotingClassifier(\n",
+    "    estimators=[\n",
+    "        ('lr',  LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)),\n",
+    "        ('svm', SVC(probability=True, random_state=RANDOM_STATE)),\n",
+    "        ('knn', KNeighborsClassifier())\n",
+    "    ], voting='soft')\n",
+    "\n",
+    "param_vc = {\n",
+    "    'lr__C'           : [0.01, 0.1, 1, 10],\n",
+    "    'knn__n_neighbors': [3, 5, 7, 9],\n",
+    "    'svm__C'          : [0.1, 1, 10]\n",
+    "}\n",
+    "\n",
+    "gs_vc = GridSearchCV(base_vc, param_vc, cv=5, scoring='f1', n_jobs=-1, verbose=0)\n",
+    "gs_vc.fit(X_tr_fs, y_tr_p)\n",
+    "\n",
+    "print(f\"✅ VC Best Parameters  : {gs_vc.best_params_}\")\n",
+    "print(f\"   CV F1-Score (mean)  : {gs_vc.best_score_:.4f}\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "073b9097",
+   "metadata": {},
+   "source": [
+    "### 4.6 Evaluasi Model Tuned"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7fc2d966",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "tuned_models = {\n",
+    "    'Logistic Regression\\n(Tuned)': gs_lr.best_estimator_,\n",
+    "    'Random Forest\\n(Tuned)'      : rs_rf.best_estimator_,\n",
+    "    'Voting Classifier\\n(Tuned)'  : gs_vc.best_estimator_\n",
+    "}\n",
+    "\n",
+    "print(\"🔄 Evaluasi best estimator pada data uji...\")\n",
+    "results_tuned = []\n",
+    "for name, mdl in tuned_models.items():\n",
+    "    res = eval_model(name, mdl, X_tr_fs, X_te_fs, y_tr_p, y_te_p)\n",
+    "    results_tuned.append(res)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "61dc194b",
+   "metadata": {},
+   "source": [
+    "### 4.7 Confusion Matrix Tuned"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "66cb40cc",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "fig, axes = plt.subplots(1, 3, figsize=(16, 5))\n",
+    "for ax, res, cmap_ in zip(axes, results_tuned, ['Blues', 'Greens', 'Oranges']):\n",
+    "    sns.heatmap(res['CM'], annot=True, fmt='d', cmap=cmap_, ax=ax,\n",
+    "                xticklabels=['Pred: 0', 'Pred: 1'],\n",
+    "                yticklabels=['Aktual: 0', 'Aktual: 1'],\n",
+    "                linewidths=1, linecolor='white',\n",
+    "                annot_kws={'size': 14, 'weight': 'bold'})\n",
+    "    sn = res['Model'].replace('\\n', ' ')\n",
+    "    ax.set_title(f\"{sn}\\nAcc: {res['Accuracy']:.3f}  |  F1: {res['F1-Score']:.3f}\",\n",
+    "                 fontsize=9, fontweight='bold')\n",
+    "    ax.set_xlabel('Prediksi'); ax.set_ylabel('Aktual')\n",
+    "\n",
+    "plt.suptitle('Confusion Matrix — Hyperparameter Tuning',\n",
+    "             fontsize=13, fontweight='bold', y=1.02)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_cm_tuned.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_cm_tuned.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1059b1a7",
+   "metadata": {},
+   "source": [
+    "### 4.8 Perbandingan Lengkap Semua 9 Model (3 Model × 3 Skenario)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "439f9bde",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "all_rows = []\n",
+    "scenarios_dict = {\n",
+    "    'Direct'        : results_dir,\n",
+    "    'Preprocessing' : results_pp,\n",
+    "    'Tuned'         : results_tuned\n",
+    "}\n",
+    "for sc, rlist in scenarios_dict.items():\n",
+    "    for r in rlist:\n",
+    "        all_rows.append({\n",
+    "            'Skenario' : sc,\n",
+    "            'Model'    : r['Model'].replace('\\n', ' '),\n",
+    "            'Accuracy' : r['Accuracy'],\n",
+    "            'Precision': r['Precision'],\n",
+    "            'Recall'   : r['Recall'],\n",
+    "            'F1-Score' : r['F1-Score']\n",
+    "        })\n",
+    "df_all = pd.DataFrame(all_rows)\n",
+    "\n",
+    "print(\"\\n📊 Tabel Perbandingan Lengkap (9 Model):\")\n",
+    "display(df_all.style\n",
+    "        .format({k: '{:.4f}' for k in ['Accuracy','Precision','Recall','F1-Score']})\n",
+    "        .background_gradient(cmap='YlGn', subset=['Accuracy','F1-Score'])\n",
+    "        .set_caption('Evaluasi 9 Model — 3 Skenario'))\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cc7282b2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# ── Grafik perbandingan semua skenario ──────────────────────────────────────\n",
+    "model_short3 = ['LR', 'Random Forest', 'Voting Clf']\n",
+    "sc_colors    = {'Direct': '#95a5a6', 'Preprocessing': '#3498db', 'Tuned': '#e74c3c'}\n",
+    "\n",
+    "fig, axes = plt.subplots(2, 2, figsize=(15, 10))\n",
+    "\n",
+    "for ax, metric in zip(axes.flatten(), ['Accuracy', 'Precision', 'Recall', 'F1-Score']):\n",
+    "    x = np.arange(len(model_short3)); w = 0.25\n",
+    "    for i, (sc, rlist) in enumerate(scenarios_dict.items()):\n",
+    "        vals = [r[metric] for r in rlist]\n",
+    "        bars = ax.bar(x + i*w, vals, w, label=sc,\n",
+    "                      color=sc_colors[sc], alpha=0.85, edgecolor='white')\n",
+    "        for b, v in zip(bars, vals):\n",
+    "            ax.text(b.get_x() + b.get_width()/2, b.get_height() + 0.003,\n",
+    "                    f'{v:.3f}', ha='center', va='bottom', fontsize=8, fontweight='bold')\n",
+    "    ax.set_xticks(x + w)\n",
+    "    ax.set_xticklabels(model_short3, fontsize=10)\n",
+    "    ax.set_title(metric, fontweight='bold', fontsize=12)\n",
+    "    ax.set_ylabel(metric); ax.set_ylim(0, 1.15); ax.legend(fontsize=9)\n",
+    "\n",
+    "plt.suptitle('Perbandingan Performa Semua Skenario (9 Model)',\n",
+    "             fontsize=14, fontweight='bold', y=1.01)\n",
+    "plt.tight_layout()\n",
+    "plt.savefig('../plots/plot_semua_skenario.png', bbox_inches='tight')\n",
+    "plt.show()\n",
+    "print(\"💾 Disimpan: plots/plot_semua_skenario.png\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3337c914",
+   "metadata": {},
+   "source": [
+    "### 4.9 Identifikasi Model Terbaik"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a980d97a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "best_row = df_all.loc[df_all['F1-Score'].idxmax()]\n",
+    "\n",
+    "print(\"=\" * 55)\n",
+    "print(\"  🏆  MODEL TERBAIK (F1-Score Tertinggi)\")\n",
+    "print(\"=\" * 55)\n",
+    "print(f\"  Skenario  : {best_row['Skenario']}\")\n",
+    "print(f\"  Model     : {best_row['Model']}\")\n",
+    "print(f\"  Accuracy  : {best_row['Accuracy']:.4f}\")\n",
+    "print(f\"  Precision : {best_row['Precision']:.4f}\")\n",
+    "print(f\"  Recall    : {best_row['Recall']:.4f}\")\n",
+    "print(f\"  F1-Score  : {best_row['F1-Score']:.4f}\")\n",
+    "print(\"=\" * 55)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a0c6fa7a",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## 💾 Bagian 5 — Simpan Model untuk Deployment Streamlit\n",
+    "---\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "faa052b6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Model terbaik = Random Forest (Tuned) — index 1 di results_tuned\n",
+    "best_model = results_tuned[1]['obj']\n",
+    "yp_best    = best_model.predict(X_te_fs)\n",
+    "\n",
+    "model_artifacts = {\n",
+    "    'model'          : best_model,\n",
+    "    'scaler'         : scaler_fs,\n",
+    "    'features'       : top_features,\n",
+    "    'le_map'         : le_map,\n",
+    "    'model_name'     : 'Random Forest (Tuned)',\n",
+    "    'f1_score'       : round(f1_score(y_te_p, yp_best, zero_division=0), 4),\n",
+    "    'accuracy'       : round(accuracy_score(y_te_p, yp_best), 4),\n",
+    "    'best_lr_params' : gs_lr.best_params_,\n",
+    "    'best_rf_params' : rs_rf.best_params_,\n",
+    "    'best_vc_params' : gs_vc.best_params_,\n",
+    "}\n",
+    "\n",
+    "joblib.dump(model_artifacts, '../model/churn_model.pkl')\n",
+    "\n",
+    "print(\"✅ Model berhasil disimpan ke '../model/churn_model.pkl'\")\n",
+    "print(f\"   File size  : {os.path.getsize('../model/churn_model.pkl') / 1024:.0f} KB\")\n",
+    "print(f\"   Model      : {model_artifacts['model_name']}\")\n",
+    "print(f\"   Fitur      : {len(top_features)} fitur\")\n",
+    "print(f\"   F1-Score   : {model_artifacts['f1_score']}\")\n",
+    "print(f\"   Accuracy   : {model_artifacts['accuracy']}\")\n",
+    "print(f\"\\n📦 Model siap untuk deployment Streamlit Cloud!\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "91e188d1",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "## ✅ Ringkasan Proyek\n",
+    "\n",
+    "| Tahap | Detail | Status |\n",
+    "|-------|--------|--------|\n",
+    "| EDA | Distribusi, missing value, korelasi, visualisasi kategorikal | ✅ |\n",
+    "| Direct Modeling | LR, RF, Voting Classifier — tanpa preprocessing | ✅ |\n",
+    "| Preprocessing | Missing value, duplikat, outlier, encoding, scaling | ✅ |\n",
+    "| Hyperparameter Tuning | GridSearchCV (LR, VC) + RandomizedSearchCV (RF) | ✅ |\n",
+    "| Feature Selection | Top-15 fitur dari feature importance RF | ✅ |\n",
+    "| **Total model** | **9 model × evaluasi lengkap** | ✅ |\n",
+    "| Deployment | Model `.pkl` + Streamlit app (`app/app.py`) | ✅ |\n",
+    "\n",
+    "### 🚀 Langkah Selanjutnya\n",
+    "1. `git init` di folder project\n",
+    "2. `git add .` → `git commit -m \"UAS Bengkel Koding DS\"`\n",
+    "3. Push ke GitHub\n",
+    "4. Deploy di [share.streamlit.io](https://share.streamlit.io) → pilih repo → set file `streamlit_app.py`\n",
+    "\n",
+    "---\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.10.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
