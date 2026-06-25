@@ -35,7 +35,7 @@ acc_val    = artifacts.get('accuracy',  'N/A')
 st.markdown("""
 <style>
 [data-testid="stAppViewContainer"] {
-    background: #e0e0e0;
+    background: #e5e5e5;
 }
 .main-header {
     background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
