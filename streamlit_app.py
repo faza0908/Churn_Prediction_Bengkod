@@ -5,8 +5,7 @@ import joblib, os
 
 # ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Customer Churn Predictor | UDINUS",
-    page_icon="🔮",
+    page_title="Customer Churn Predictor",
     layout="wide",
     initial_sidebar_state="expanded"
 )
