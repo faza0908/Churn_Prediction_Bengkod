@@ -11,11 +11,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Model Path (root-level untuk Streamlit Cloud) ─────────────────────────────
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'churn_model.pkl')
+# ── Model Path — mencari churn_model.pkl di folder yang sama dengan file ini ──
+# Ini bekerja baik di lokal maupun Streamlit Cloud (flat structure)
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, 'churn_model.pkl')
 
 @st.cache_resource
 def load_model():
+    if not os.path.exists(MODEL_PATH):
+        st.error(f"❌ Model tidak ditemukan di: {MODEL_PATH}")
+        st.stop()
     return joblib.load(MODEL_PATH)
 
 artifacts  = load_model()
@@ -49,7 +54,6 @@ st.markdown("""
 .result-nochurn  { background:linear-gradient(135deg,#1b5e20,#43a047); padding:1.8rem; border-radius:14px; color:#fff; text-align:center; }
 .result-churn h2,.result-nochurn h2 { margin:0; font-size:1.6rem; }
 .result-churn p,.result-nochurn p   { margin:.5rem 0 0; opacity:.9; font-size:1rem; }
-.section-divider { border-top:2px solid #e3e8f0; margin:1.2rem 0; }
 .stButton>button {
     background:linear-gradient(135deg,#1a237e,#3949ab);
     color:#fff; border:none; border-radius:8px;
@@ -102,33 +106,32 @@ with tab1:
 
     with c1:
         st.markdown("**📊 Aktivitas Digital**")
-        avg_session_time          = st.number_input("Rata-rata Waktu Sesi (menit)", 0.0, 200.0, 10.0, 0.5, key="ast")
-        pages_per_session         = st.number_input("Halaman per Sesi", 1.0, 50.0, 5.0, 0.5, key="pps")
-        total_visits              = st.number_input("Total Kunjungan", 1, 500, 30, key="tv")
-        email_open_rate           = st.slider("Email Open Rate", 0.0, 1.0, 0.30, 0.01, format="%.2f", key="eor")
-        email_click_rate          = st.slider("Email Click Rate", 0.0, 1.0, 0.10, 0.01, format="%.2f", key="ecr")
+        avg_session_time           = st.number_input("Rata-rata Waktu Sesi (menit)", 0.0, 200.0, 10.0, 0.5, key="ast")
+        pages_per_session          = st.number_input("Halaman per Sesi", 1.0, 50.0, 5.0, 0.5, key="pps")
+        total_visits               = st.number_input("Total Kunjungan", 1, 500, 30, key="tv")
+        email_open_rate            = st.slider("Email Open Rate", 0.0, 1.0, 0.30, 0.01, format="%.2f", key="eor")
+        email_click_rate           = st.slider("Email Click Rate", 0.0, 1.0, 0.10, 0.01, format="%.2f", key="ecr")
 
     with c2:
         st.markdown("**💰 Transaksi & Nilai**")
-        total_spent               = st.number_input("Total Pengeluaran (USD)", 0.0, 10000.0, 500.0, 10.0, key="ts")
-        avg_order_value           = st.number_input("Rata-rata Nilai Transaksi (USD)", 0.0, 2000.0, 100.0, 5.0, key="aov")
-        lifetime_value            = st.number_input("Lifetime Value (USD)", 0.0, 50000.0, 2000.0, 100.0, key="lv")
-        last_3_month_purchase_freq= st.number_input("Frek. Pembelian 3 Bulan Terakhir", 0, 50, 3, key="lmpf")
-        marketing_spend_per_user  = st.number_input("Biaya Marketing per User (USD)", 0.0, 500.0, 20.0, 1.0, key="mspu")
+        total_spent                = st.number_input("Total Pengeluaran (USD)", 0.0, 10000.0, 500.0, 10.0, key="ts")
+        avg_order_value            = st.number_input("Rata-rata Nilai Transaksi (USD)", 0.0, 2000.0, 100.0, 5.0, key="aov")
+        lifetime_value             = st.number_input("Lifetime Value (USD)", 0.0, 50000.0, 2000.0, 100.0, key="lv")
+        last_3_month_purchase_freq = st.number_input("Frek. Pembelian 3 Bulan Terakhir", 0, 50, 3, key="lmpf")
+        marketing_spend_per_user   = st.number_input("Biaya Marketing per User (USD)", 0.0, 500.0, 20.0, 1.0, key="mspu")
 
     with c3:
         st.markdown("**👤 Profil & Kepuasan**")
-        age                = st.number_input("Usia Pelanggan", 18, 80, 35, key="age")
-        satisfaction_score = st.slider("Skor Kepuasan (1–5)", 1.0, 5.0, 3.5, 0.1, key="ss")
-        nps_score          = st.slider("NPS Score", -100, 100, 10, key="nps")
-        support_tickets    = st.number_input("Jumlah Tiket Support", 0, 20, 1, key="st_")
-        delivery_delay_days= st.number_input("Keterlambatan Pengiriman (hari)", 0, 30, 2, key="ddd")
+        age                 = st.number_input("Usia Pelanggan", 18, 80, 35, key="age")
+        satisfaction_score  = st.slider("Skor Kepuasan (1–5)", 1.0, 5.0, 3.5, 0.1, key="ss")
+        nps_score           = st.slider("NPS Score", -100, 100, 10, key="nps")
+        support_tickets     = st.number_input("Jumlah Tiket Support", 0, 20, 1, key="st_")
+        delivery_delay_days = st.number_input("Keterlambatan Pengiriman (hari)", 0, 30, 2, key="ddd")
 
-    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+    st.markdown("---")
     predict_btn = st.button("🔮  Prediksi Churn Sekarang", use_container_width=True)
 
     if predict_btn:
-        # Build input vector sesuai urutan top_features
         feature_values = {
             'avg_session_time'           : avg_session_time,
             'pages_per_session'          : pages_per_session,
@@ -175,11 +178,10 @@ with tab1:
                     </p>
                 </div>""", unsafe_allow_html=True)
         with r2:
-            st.metric("Prob. Churn",      f"{prob[1]*100:.1f}%")
+            st.metric("Prob. Churn",       f"{prob[1]*100:.1f}%")
         with r3:
-            st.metric("Prob. Tidak Churn",f"{prob[0]*100:.1f}%")
+            st.metric("Prob. Tidak Churn", f"{prob[0]*100:.1f}%")
 
-        # Indikator risiko
         if prob[1] > 0.65:
             risk_label = "🔴 Risiko Tinggi"
         elif prob[1] > 0.40:
@@ -188,7 +190,6 @@ with tab1:
             risk_label = "🟢 Risiko Rendah"
         st.info(f"**Tingkat Risiko Churn:** {risk_label}")
 
-        # Rekomendasi otomatis
         st.markdown("### 💡 Rekomendasi Tindakan")
         if pred == 1:
             recs = []
@@ -220,7 +221,7 @@ with tab1:
 # ══════════════════════════════════════════════════════════════════════════════
 with tab2:
     st.markdown("### 📤 Upload File CSV untuk Prediksi Massal")
-    st.info(f"File CSV harus memiliki kolom berikut (minimal): `{', '.join(features)}`")
+    st.info(f"File CSV harus memiliki kolom: `{', '.join(features)}`")
 
     uploaded = st.file_uploader("Pilih file CSV", type=["csv"])
 
@@ -232,7 +233,7 @@ with tab2:
 
         missing_cols = [f for f in features if f not in df_batch.columns]
         if missing_cols:
-            st.error(f"❌ Kolom tidak ditemukan dalam file: `{missing_cols}`")
+            st.error(f"❌ Kolom tidak ditemukan: `{missing_cols}`")
         else:
             if st.button("🚀 Jalankan Prediksi Batch", use_container_width=True):
                 with st.spinner("Memproses prediksi..."):
@@ -242,30 +243,24 @@ with tab2:
                     probs = model.predict_proba(X_bsc)[:, 1]
 
                 df_res = df_batch.copy()
-                df_res['Prediksi_Churn']       = preds
-                df_res['Probabilitas_Churn']    = np.round(probs, 4)
-                df_res['Status']               = df_res['Prediksi_Churn'].map({0:'Tidak Churn',1:'Churn'})
-                df_res['Tingkat_Risiko']        = pd.cut(probs, bins=[-0.01,0.40,0.65,1.01],
-                                                          labels=['Rendah','Sedang','Tinggi'])
+                df_res['Prediksi_Churn']    = preds
+                df_res['Probabilitas_Churn']= np.round(probs, 4)
+                df_res['Status']            = df_res['Prediksi_Churn'].map({0:'Tidak Churn', 1:'Churn'})
+                df_res['Tingkat_Risiko']    = pd.cut(probs, bins=[-0.01, 0.40, 0.65, 1.01],
+                                                      labels=['Rendah','Sedang','Tinggi'])
 
-                # Ringkasan
-                st.markdown("### 📈 Ringkasan Hasil")
                 m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Total Data",          f"{len(df_res):,}")
-                m2.metric("Prediksi Churn",       f"{preds.sum():,}", delta=f"{preds.mean()*100:.1f}%")
-                m3.metric("Prediksi Tidak Churn", f"{(preds==0).sum():,}")
-                m4.metric("Rata-rata Prob. Churn",f"{probs.mean()*100:.1f}%")
+                m1.metric("Total Data",           f"{len(df_res):,}")
+                m2.metric("Prediksi Churn",        f"{preds.sum():,}", delta=f"{preds.mean()*100:.1f}%")
+                m3.metric("Prediksi Tidak Churn",  f"{(preds==0).sum():,}")
+                m4.metric("Avg Prob. Churn",       f"{probs.mean()*100:.1f}%")
 
-                # Tabel
-                st.markdown("### 📋 Hasil Detail")
                 st.dataframe(
                     df_res[['Prediksi_Churn','Probabilitas_Churn','Status','Tingkat_Risiko']],
                     use_container_width=True, height=300)
 
-                # Download
                 csv_out = df_res.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "⬇️ Download Hasil Prediksi (CSV)", csv_out,
+                st.download_button("⬇️ Download Hasil Prediksi (CSV)", csv_out,
                     file_name="hasil_prediksi_churn.csv", mime="text/csv",
                     use_container_width=True)
     else:
@@ -286,29 +281,26 @@ with tab3:
     with col_left:
         st.markdown("### 📖 Panduan Fitur Input")
         feat_guide = {
-            'avg_session_time'           : ("Waktu Sesi (menit)",       "Durasi rata-rata per sesi penggunaan.",           "0 – 200"),
-            'pages_per_session'          : ("Halaman per Sesi",         "Halaman rata-rata yang dikunjungi per sesi.",      "1 – 50"),
-            'marketing_spend_per_user'   : ("Biaya Marketing (USD)",    "Pengeluaran marketing untuk pelanggan ini.",       "0 – 500"),
-            'age'                        : ("Usia",                     "Usia pelanggan dalam tahun.",                      "18 – 80"),
-            'email_open_rate'            : ("Email Open Rate",          "Proporsi email yang dibuka (0=0%, 1=100%).",       "0.0 – 1.0"),
-            'total_visits'               : ("Total Kunjungan",          "Jumlah total kunjungan ke platform.",              "1 – 500"),
-            'email_click_rate'           : ("Email Click Rate",         "Proporsi klik tautan dalam email.",                "0.0 – 1.0"),
-            'nps_score'                  : ("NPS Score",                "Net Promoter Score — ukuran loyalitas.",           "-100 – 100"),
-            'satisfaction_score'         : ("Skor Kepuasan",            "Penilaian kepuasan layanan (1=buruk, 5=baik).",    "1.0 – 5.0"),
-            'lifetime_value'             : ("Lifetime Value (USD)",     "Total nilai pelanggan selama berlangganan.",       "0 – 50000"),
-            'total_spent'                : ("Total Pengeluaran (USD)",  "Akumulasi pengeluaran pelanggan.",                 "0 – 10000"),
-            'avg_order_value'            : ("Nilai Transaksi Avg (USD)","Rata-rata nilai per transaksi.",                   "0 – 2000"),
-            'last_3_month_purchase_freq' : ("Frek. Beli 3 Bulan",      "Jumlah pembelian dalam 3 bulan terakhir.",         "0 – 50"),
-            'delivery_delay_days'        : ("Keterlambatan (hari)",     "Rata-rata keterlambatan pengiriman.",              "0 – 30"),
-            'support_tickets'            : ("Tiket Support",            "Total tiket dukungan yang pernah dibuat.",         "0 – 20"),
+            'avg_session_time'           : ("Waktu Sesi (menit)",      "Durasi rata-rata per sesi penggunaan.",          "0 – 200"),
+            'pages_per_session'          : ("Halaman per Sesi",        "Halaman rata-rata yang dikunjungi per sesi.",    "1 – 50"),
+            'marketing_spend_per_user'   : ("Biaya Marketing (USD)",   "Pengeluaran marketing untuk pelanggan ini.",     "0 – 500"),
+            'age'                        : ("Usia",                    "Usia pelanggan dalam tahun.",                    "18 – 80"),
+            'email_open_rate'            : ("Email Open Rate",         "Proporsi email yang dibuka (0=0%, 1=100%).",     "0.0 – 1.0"),
+            'total_visits'               : ("Total Kunjungan",         "Jumlah total kunjungan ke platform.",            "1 – 500"),
+            'email_click_rate'           : ("Email Click Rate",        "Proporsi klik tautan dalam email.",              "0.0 – 1.0"),
+            'nps_score'                  : ("NPS Score",               "Net Promoter Score — ukuran loyalitas.",         "-100 – 100"),
+            'satisfaction_score'         : ("Skor Kepuasan",           "Penilaian kepuasan layanan (1=buruk,5=baik).",   "1.0 – 5.0"),
+            'lifetime_value'             : ("Lifetime Value (USD)",    "Total nilai pelanggan selama berlangganan.",     "0 – 50000"),
+            'total_spent'                : ("Total Pengeluaran (USD)", "Akumulasi pengeluaran pelanggan.",               "0 – 10000"),
+            'avg_order_value'            : ("Nilai Transaksi Avg",     "Rata-rata nilai per transaksi.",                 "0 – 2000"),
+            'last_3_month_purchase_freq' : ("Frek. Beli 3 Bulan",     "Jumlah pembelian dalam 3 bulan terakhir.",       "0 – 50"),
+            'delivery_delay_days'        : ("Keterlambatan (hari)",    "Rata-rata keterlambatan pengiriman.",            "0 – 30"),
+            'support_tickets'            : ("Tiket Support",           "Total tiket dukungan yang pernah dibuat.",       "0 – 20"),
         }
         for feat in features:
             if feat in feat_guide:
                 name, desc, rng = feat_guide[feat]
-                st.markdown(f"""
-                **{name}** `{feat}`  
-                {desc} &nbsp;|&nbsp; Range: `{rng}`
-                """)
+                st.markdown(f"**{name}** `{feat}`  \n{desc} | Range: `{rng}`")
                 st.markdown("---")
 
     with col_right:
@@ -317,38 +309,28 @@ with tab3:
         #### 🤖 Model yang Digunakan
         **{model_name}** dengan **{len(features)} fitur** terpilih dari *feature importance* analysis.
 
-        #### 🔬 Skenario Pemodelan
+        #### 🔬 Skenario Pemodelan (9 Model Total)
         | Skenario | Keterangan |
         |----------|-----------|
-        | Direct | Tanpa preprocessing, baseline |
-        | Preprocessing | Missing value, outlier, encoding, scaling |
-        | **Tuned** | **Feature selection + hyperparameter tuning** ← *Terbaik* |
+        | Direct | Tanpa preprocessing — baseline |
+        | Preprocessing | Cleaning + encoding + scaling |
+        | **Tuned** | Feature selection + hyperparameter tuning ← *Terbaik* |
 
         #### 📊 Dataset
-        - **Sumber:** Sales & Marketing Customer Dataset
+        - **Sumber:** Sales & Marketing Customer Dataset (Kaggle)
         - **Ukuran:** 15.000 records × 30 kolom
-        - **Target:** `churn` (0 = tidak, 1 = ya)
+        - **Target:** `churn` (0 = tidak churn, 1 = churn)
 
-        #### ⚠️ Catatan Penggunaan
-        - Hasil prediksi bersifat **probabilistik** — gunakan sebagai alat bantu, bukan keputusan final.
-        - Input dengan nilai `0` untuk kolom yang tidak diketahui.
-        - Model dioptimalkan dengan **RandomizedSearchCV** (cv=5, scoring=F1).
+        #### ⚠️ Catatan
+        - Hasil bersifat **probabilistik** — gunakan sebagai alat bantu keputusan.
+        - Isi `0` untuk kolom yang tidak diketahui nilainya.
         """)
-
-        st.markdown("#### 🏆 Perbandingan Skenario")
-        df_summary = pd.DataFrame({
-            'Skenario'  : ['Direct', 'Preprocessing', 'Tuned (Best)'],
-            'Teknik'    : ['Minimal encoding', 'Full preprocessing', 'Feature sel. + tuning'],
-            'Kelebihan' : ['Cepat, baseline', 'Data lebih bersih', 'Optimal & efisien'],
-        })
-        st.dataframe(df_summary.set_index('Skenario'), use_container_width=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown("""
 <div style='text-align:center;color:#888;font-size:.82rem;padding:.4rem'>
     🎓 <strong>UAS Bengkel Koding Data Science</strong> | Universitas Dian Nuswantoro Semarang<br>
-    Model: Random Forest (Tuned) | Dataset: Sales & Marketing Customer (15.000 records) |
-    Built with ❤️ using Streamlit
+    Model: Random Forest (Tuned) | Dataset: Sales & Marketing Customer (15.000 records)
 </div>
 """, unsafe_allow_html=True)
