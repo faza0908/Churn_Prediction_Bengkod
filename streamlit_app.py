@@ -68,8 +68,7 @@ st.markdown("""
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="main-header">
-    <h1>🔮 Customer Churn Prediction System</h1>
-    <p>UAS Bengkel Koding Data Science — Universitas Dian Nuswantoro Semarang</p>
+    <h1> Customer Churn Prediction System</h1>
 </div>
 """, unsafe_allow_html=True)
 
